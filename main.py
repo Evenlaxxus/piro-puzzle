@@ -1,7 +1,11 @@
 import math
 import os
+import random
 import sys
+from typing import List
+
 import cv2
+import numpy as np
 
 
 def angle(points):
@@ -32,32 +36,36 @@ def shiftAngleArray(angles):
     return angles[possibleBaseAngles:] + angles[:possibleBaseAngles]
 
 
-# def scale_to_one_size
-# def rotate(image, base_points, contours):
-#     p1, p2 = base_points
-#     start_point, end_point = p1[2], p2[0]
-#     angle = math.atan2((end_point[1] - start_point[1]), (end_point[0] - start_point[0])) * (180.0 / math.pi)
-#     angle %= 180.0
-#
-#     moments = cv2.moments(contours[0])
-#     center_x = int(moments["m10"] / moments["m00"])
-#     center_y = int(moments["m01"] / moments["m00"])
-#     rot_mat = cv2.getRotationMatrix2D((center_y, center_x), angle, 1.0)
-#
-#     height, width = image.shape
-#     res_img = cv2.warpAffine(image, rot_mat, (width, height), flags=cv2.INTER_LINEAR)
-#
-#
-#     contours, hierarchy = cv2.findContours(res_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-#     imgCopy = cv2.cvtColor(res_img.copy(), cv2.COLOR_GRAY2BGR)
-#
-#     epsilon = 0.005 * cv2.arcLength(contours[0], True)
-#     approx = cv2.approxPolyDP(contours[0], epsilon, True)
-#
-#     cv2.drawContours(imgCopy, [approx], 0, color=(0, 0, 255), thickness=2)
-#     cv2.imshow("eee", imgCopy)
-#
-#     return res_img
+def calculate_peaks_distance(points, base):
+    p1, p2 = base
+
+    a = p1[1] - p2[1]
+    b = p2[0] - p1[0]
+    c = -1 * (a * (p2[0]) + b * (p2[1]))
+    distances = []
+
+    base_length = math.hypot(p1[1] - p1[0], p2[1] - p2[0])
+
+    for p3 in points:
+        x, y = p3[1][0], p3[1][1]
+        distance = abs(a * x + b * y + c) / math.sqrt(a ** 2 + b ** 2)
+        distances.append(distance / base_length)
+    print(distances)
+    return distances
+
+
+def evaluate(correct_list: List, results):
+    scores = []
+    for i in range(0, len(results)):
+        score = 0
+        for j in range(0, len(results[i])):
+            if correct_list[i] == results[i][j]:
+                score = 1 / (j + 1)
+                break
+        if score == 0:
+            score = 1 / len(correct_list)
+        scores.append(score)
+    return sum(scores) / len(scores)
 
 
 class Piro:
@@ -89,14 +97,25 @@ class Piro:
             shiftedAngles = shiftAngleArray(angles)
             print(shiftedAngles)
             base_points = shiftedAngles[0][1], shiftedAngles[0][2]
+            print(imgCopy.shape)
+            calculate_peaks_distance(shiftedAngles[2:], base_points)
             cv2.line(imgCopy, base_points[0], base_points[1], (0, 255, 0))
 
             cv2.drawContours(imgCopy, [approx], 0, color=(0, 0, 255), thickness=2)
             cv2.imshow("image", imgCopy)
             cv2.waitKey()
 
+        return [[0]] * len(self.images.keys())
+
 
 if __name__ == '__main__':
     piroObject = Piro()
     piroObject.load(os.path.dirname(sys.argv[1]), int(sys.argv[2]))
-    piroObject.solve()
+    results = piroObject.solve()  # results should be a list with best matches, np. [[1,2],[4,1]]
+    print(results)
+    with open(sys.argv[1] + 'correct.txt', 'r') as f:
+        correct_list = []
+        for line in f.readlines():
+            correct_list.append(int(line))
+        print(correct_list)
+        print(evaluate(correct_list, results))
