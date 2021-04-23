@@ -31,7 +31,7 @@ def shiftAngleArray(angles):
     return angles[possibleBaseAngles:] + angles[:possibleBaseAngles]
 
 
-class piro:
+class Piro:
     def __init__(self):
         self.images = dict()
 
@@ -58,12 +58,12 @@ class piro:
                 angles.append(angle(p))
             print(shiftAngleArray(angles))
 
-            cv.drawContours(imgCopy, [approx], 0, color=(255, 0, 0), thickness=2)
+            cv.drawContours(imgCopy, [approx], 0, color=(0, 0, 255), thickness=2)
             cv.imshow("image", imgCopy)
             cv.waitKey()
 
 
 if __name__ == '__main__':
-    piroObject = piro()
-    piroObject.load(os.path.dirname(sys.argv[1]), 6)
+    piroObject = Piro()
+    piroObject.load(os.path.dirname(sys.argv[1]), int(sys.argv[2]))
     piroObject.solve()
