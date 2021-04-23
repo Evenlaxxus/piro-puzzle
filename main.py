@@ -5,6 +5,32 @@ import cv2 as cv
 import numpy as np
 
 
+def angle(points):
+    ang = math.degrees(math.atan2(points[2][1] - points[1][1], points[2][0] - points[1][0]) - math.atan2(
+        points[0][1] - points[1][1], points[0][0] - points[1][0]))
+    return ang + 360 if ang < 0 else ang
+
+
+def shiftAngleArray(angles):
+    minimum = 360
+    minDiffSum = 360
+    for i in range(-1, len(angles) - 1):
+        diff = 90 - angles[i]
+        if diff < 0:
+            diff = 0 - diff
+        if diff < minimum:
+            diff2 = 90 - angles[i + 1]
+            if 85 < angles[i + 1] < 95:
+                diff2 = 90 - angles[i + 1]
+                if diff2 < 0:
+                    diff2 = 0 - diff2
+                diffSum = diff + diff2
+                if diffSum < minDiffSum:
+                    possibleBaseAngles = i
+                    minDiffSum = diffSum
+    return angles[possibleBaseAngles:] + angles[:possibleBaseAngles]
+
+
 class piro:
     def __init__(self):
         self.images = dict()
@@ -18,31 +44,23 @@ class piro:
             contours, hierarchy = cv.findContours(im, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
             imgCopy = cv.cvtColor(im.copy(), cv.COLOR_GRAY2BGR)
 
-            epsilon = 0.007 * cv.arcLength(contours[0], True)
+            epsilon = 0.0069 * cv.arcLength(contours[0], True)
             approx = cv.approxPolyDP(contours[0], epsilon, True)
             print(len(approx))
-            vectors = []
+            points = []
 
-            for i in range(len(approx) - 1):
-                vectors.append((approx[i + 1, 0, 0] - approx[i, 0, 0], approx[i + 1, 0, 1] - approx[i, 0, 1]))
-            vectors.append((approx[-1, 0, 0] - approx[0, 0, 0], approx[-1, 0, 1] - approx[0, 0, 1]))
-            print(vectors)
+            for i in range(-2, len(approx) - 2):
+                points.append(((approx[i][0][0], approx[i][0][1]), (approx[i + 1][0][0], approx[i + 1][0][1]),
+                               (approx[i + 2][0][0], approx[i + 2][0][1])))
 
             angles = []
-            for v in range(len(vectors) - 1):
-                angles.append(self.angle(vectors[v], vectors[v + 1]))
-            angles.append(self.angle(vectors[-1], vectors[0]))
-            print(angles)
+            for p in points:
+                angles.append(angle(p))
+            print(shiftAngleArray(angles))
 
             cv.drawContours(imgCopy, [approx], 0, color=(255, 0, 0), thickness=2)
             cv.imshow("image", imgCopy)
             cv.waitKey()
-
-    def angle(self, v1, v2):
-        unit_vector_1 = v1 / np.linalg.norm(v1)
-        unit_vector_2 = v2 / np.linalg.norm(v2)
-        dot_product = np.dot(unit_vector_1, unit_vector_2)
-        return np.arccos(dot_product) * (180.0 / math.pi)
 
 
 if __name__ == '__main__':
