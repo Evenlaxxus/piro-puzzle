@@ -36,29 +36,14 @@ def shiftAngleArray(angles):
     return angles[possibleBaseAngles:] + angles[:possibleBaseAngles]
 
 
-def findLineEquation(points):
-    x_coords, y_coords = zip(*points)
-    A = np.vstack([x_coords, np.ones(len(x_coords))]).T
-    a, b = np.linalg.lstsq(A, y_coords)[0]
-    return {"a": a, "b": b}
+def distanceBetweenPointAndLine(points):
+    # Punkty na linii
+    p1 = np.array(points[0])
+    p2 = np.array(points[1])
 
-
-def calculate_peaks_distance(points, base):
-    p1, p2 = base
-
-    a = p1[1] - p2[1]
-    b = p2[0] - p1[0]
-    c = -1 * (a * (p2[0]) + b * (p2[1]))
-    distances = []
-
-    base_length = math.hypot(p1[1] - p1[0], p2[1] - p2[0])
-
-    for p3 in points:
-        x, y = p3[1][0], p3[1][1]
-        distance = abs(a * x + b * y + c) / math.sqrt(a ** 2 + b ** 2)
-        distances.append(distance / base_length)
-    print(distances)
-    return distances
+    # Punkt poza linią
+    p3 = np.array(points[2])
+    return np.linalg.norm(np.cross(p2 - p1, p1 - p3)) / np.linalg.norm(p2 - p1)
 
 
 def evaluate(correct_list: List, results):
@@ -76,13 +61,16 @@ def evaluate(correct_list: List, results):
 
 
 class Piro:
-    def __init__(self, image):
+    def __init__(self, image, allImages):
         self.image = image
+        self.images = allImages
         self.basePoints = tuple()
+        self.baseLength = 1
         self.armPoints1 = tuple()
         self.armPoints2 = tuple()
-        self.armFunction1 = dict()
-        self.armFunction2 = dict()
+        self.allPoints = set()
+        self.distancesToNearestArmNormalized = dict()
+        self.calculatedAngles = dict()
 
     def solve(self):
         contours, hierarchy = cv2.findContours(im, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -92,10 +80,9 @@ class Piro:
         approx = cv2.approxPolyDP(contours[0], epsilon, True)
         print(len(approx))
         points = []
-        allPoints = []
 
         for i in range(-2, len(approx) - 2):
-            allPoints.append((approx[i][0][0], approx[i][0][1]))
+            self.allPoints.add((approx[i][0][0], approx[i][0][1]))
             points.append(((approx[i][0][0], approx[i][0][1]), (approx[i + 1][0][0], approx[i + 1][0][1]),
                            (approx[i + 2][0][0], approx[i + 2][0][1])))
 
@@ -104,21 +91,32 @@ class Piro:
             angles.append(angle(p))
         shiftedAngles = shiftAngleArray(angles)
         print(shiftedAngles)
+        self.makeCalculatedAngles(shiftedAngles)
+        print(self.calculatedAngles)
         self.basePoints = shiftedAngles[0][1], shiftedAngles[0][2]
         self.armPoints1 = (shiftedAngles[0][0], shiftedAngles[0][1])
         self.armPoints2 = (shiftedAngles[1][1], shiftedAngles[1][2])
+        self.allPoints.remove(self.basePoints[0])
+        self.allPoints.remove(self.basePoints[1])
+        self.baseLength = math.dist(self.basePoints[0], self.basePoints[1])
 
-        self.armFunction1 = findLineEquation(self.armPoints1)
-        self.armFunction2 = findLineEquation(self.armPoints2)
-        calculate_peaks_distance(shiftedAngles[2:], self.basePoints)
+        for p in self.allPoints:
+            self.distancesToNearestArmNormalized[p] = (min(
+                distanceBetweenPointAndLine((self.armPoints1[0], self.armPoints1[1], p)),
+                distanceBetweenPointAndLine((self.armPoints2[0], self.armPoints2[1], p))) / self.baseLength)
+            distanceBetweenPointAndLine((p, self.basePoints[0], self.basePoints[1]))
 
-        # print("functions", self.armPoints1, self.armFunction1)
+        print("d", self.distancesToNearestArmNormalized)
 
         cv2.drawContours(imgCopy, [approx], 0, color=(0, 0, 255), thickness=2)
         cv2.imshow("image", imgCopy)
         cv2.waitKey()
 
         return [0]
+
+    def makeCalculatedAngles(self, angles):
+        for a in angles:
+            self.calculatedAngles[a[1]] = a[3]
 
 
 if __name__ == '__main__':
@@ -132,6 +130,6 @@ if __name__ == '__main__':
 
     results = []
     for key, im in images.items():
-        piroObject = Piro(im)
+        piroObject = Piro(im, images)
         results.append(piroObject.solve())
     print("Final score", evaluate(correct_list, results))
