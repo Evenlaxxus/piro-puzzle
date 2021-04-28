@@ -23,14 +23,10 @@ def evaluate(correct_list: List, results):
 class Piro:
     def __init__(self, image, name):
         self.name = name
-        self.image = image
+        self.image = cv2.copyMakeBorder(image, 50, 50, 50, 50, cv2.BORDER_CONSTANT)
         self.basePoints = tuple()
         self.baseLength = 1
-        self.armPoints1 = tuple()
-        self.armPoints2 = tuple()
         self.allPoints = []
-        self.distancesToNearestArmNormalized = dict()
-        self.calculatedAngles = dict()
         self.distances = []
         self.pointsToCheck = []
         self.contours = None
@@ -38,7 +34,6 @@ class Piro:
 
     def process(self):
         _ = self.getMetrics()
-
         self.image = self.rotateImage()
         approx, imgCopy = self.getMetrics()
         if self.basePoints[0][1] < self.image.shape[:2][0] / 2:
@@ -59,7 +54,6 @@ class Piro:
             cv2.circle(imgCopy, point, radius=0, color=(0, 255, 0), thickness=6)
 
         print(self.basePoints)
-        cv2.arrowedLine(imgCopy, self.basePoints[0], self.basePoints[1], color=(0, 0, 255), thickness=2)
         cv2.imshow("image", imgCopy)
         cv2.waitKey()
 
@@ -109,8 +103,8 @@ class Piro:
     def getCurvePointsToCheck(self, threshold):
         arms = (self.allPoints[-1], self.allPoints[2])
         armDistance = arms[1][0] - arms[0][0]
-        step = round(self.baseLength * (threshold / 100))
-        for i in range(step, round(armDistance - step), step):
+        step = round(armDistance * (threshold / 100))
+        for i in range(0, round(armDistance), step):
             for p in self.contours[0]:
                 if p[0][0] == (arms[0][0] + i) and p[0][1] not in range(self.basePoints[0][1] - 5,
                                                                         self.basePoints[0][1] + 5):
@@ -130,8 +124,7 @@ class Piro:
         for o in piroObjects:
             distances2 = o.distances
 
-            if len(distances) > len(
-                    distances2):  # TODO: to jest smrut, raczej wszystkie dystanse powinny być takiej samej długości
+            if len(distances) > len(distances2):  # TODO: to jest smrut, raczej wszystkie dystanse powinny być takiej samej długości
                 distances = distances[:len(distances2)]
             elif len(distances) < len(distances2):
                 distances2 = distances2[:len(distances)]
@@ -169,6 +162,7 @@ if __name__ == '__main__':
     obj_list = []
     for key, im in images.items():
         piroObject = Piro(im, key)
+        print(key)
         piroObject.process()
         obj_list.append(piroObject)
 
