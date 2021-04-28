@@ -3,6 +3,7 @@ import os
 import sys
 from statistics import mean
 from typing import List
+import numpy as np
 import cv2
 
 
@@ -31,6 +32,9 @@ class Piro:
         self.pointsToCheck = []
         self.contours = None
         self.hierarchy = None
+        self.armsPoints = tuple()
+        self.curvePoints = []
+        self.contour = []
 
     def process(self):
         _ = self.getMetrics()
@@ -40,11 +44,9 @@ class Piro:
             self.image = self.rotateImage(flip="yes")
             approx, imgCopy = self.getMetrics()
 
-        self.getCurvePointsToCheck(2)
+        self.getEdgePoints()
 
-        # Tu jest wywołanie tych krawędzi
-        # edges = get_edges(self.allPoints, self.basePoints)
-        # self.distances = monte_dupa(self.basePoints, edges, 10)
+        self.getCurvePointsToCheck()
 
         self.getDistances()
 
@@ -75,9 +77,28 @@ class Piro:
                 points = points[i:] + shiftTable
                 break
             shiftTable.append(points[i])
+
+        for point in self.contours[0]:
+            self.contour.append(point[0])
+
+        shiftTable = []
+        for i in range(len(self.contour)):
+            if np.all(self.contour[i] == self.basePoints[0]):
+                self.contour = self.contour[i:] + shiftTable
+                break
+            shiftTable.append(self.contour[i])
         self.allPoints = points
+        self.armsPoints = (self.allPoints[-1], self.allPoints[2])
 
     def getMetrics(self):
+        self.curvePoints = []
+        self.contour = []
+        self.pointsToCheck = []
+        self.allPoints = []
+        self.distances = []
+        self.armsPoints = tuple()
+        self.basePoints = tuple()
+
         self.contours, self.hierarchy = cv2.findContours(self.image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         imgCopy = cv2.cvtColor(self.image.copy(), cv2.COLOR_GRAY2BGR)
 
@@ -100,16 +121,21 @@ class Piro:
         rotationMatrix = cv2.getRotationMatrix2D((cX, cY), deg, 1.0)
         return cv2.warpAffine(self.image, rotationMatrix, (w, h), flags=cv2.INTER_LINEAR)
 
-    def getCurvePointsToCheck(self, threshold):
-        arms = (self.allPoints[-1], self.allPoints[2])
-        armDistance = arms[1][0] - arms[0][0]
-        step = round(armDistance * (threshold / 100))
-        for i in range(0, round(armDistance), step):
-            for p in self.contours[0]:
-                if p[0][0] == (arms[0][0] + i) and p[0][1] not in range(self.basePoints[0][1] - 5,
-                                                                        self.basePoints[0][1] + 5):
-                    self.pointsToCheck.append((arms[0][0] + i, p[0][1]))
-                    break
+    def getCurvePointsToCheck(self):
+        step = round(len(self.curvePoints)/50)
+        for i in range(step, len(self.curvePoints), step):
+            self.pointsToCheck.append(self.curvePoints[i])
+
+    def getEdgePoints(self):
+        curve = False
+        for point in self.contour:
+            if curve:
+                self.curvePoints.append(tuple(point))
+            if np.all(point == self.armsPoints[1]):
+                self.curvePoints.append(tuple(point))
+                curve = True
+            if np.all(point == self.armsPoints[0]):
+                curve = False
 
     def getDistances(self):
         for point in self.pointsToCheck:
