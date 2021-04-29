@@ -24,7 +24,7 @@ def evaluate(correct_list: List, results):
 class Piro:
     def __init__(self, image, name):
         self.name = name
-        self.image = cv2.copyMakeBorder(image, 50, 50, 50, 50, cv2.BORDER_CONSTANT)
+        self.image = cv2.copyMakeBorder(image, 100, 100, 100, 100, cv2.BORDER_CONSTANT)
         self.basePoints = tuple()
         self.baseLength = 1
         self.allPoints = []
@@ -55,9 +55,9 @@ class Piro:
         for point in self.pointsToCheck:
             cv2.circle(imgCopy, point, radius=0, color=(0, 255, 0), thickness=6)
 
-        print(self.basePoints)
-        cv2.imshow("image", imgCopy)
-        cv2.waitKey()
+        # print(self.basePoints)
+        # cv2.imshow("image", imgCopy)
+        # cv2.waitKey()
 
     def getBaseAndShift(self, cont):
         maxLength = 0.0
@@ -122,7 +122,7 @@ class Piro:
         return cv2.warpAffine(self.image, rotationMatrix, (w, h), flags=cv2.INTER_LINEAR)
 
     def getCurvePointsToCheck(self):
-        step = round(len(self.curvePoints)/50)
+        step = round(len(self.curvePoints) / 50)
         for i in range(step, len(self.curvePoints), step):
             self.pointsToCheck.append(self.curvePoints[i])
 
@@ -159,7 +159,7 @@ class Piro:
             avg_diff = []
             for i in range(len(distances)):
                 avg_diff.append(abs(avg - (distances[i] + distances2[i])))
-            print("avg_diff", avg_diff)
+            # print("avg_diff", avg_diff)
             result_dict[o] = mean(avg_diff)
 
         final_result = []
@@ -168,14 +168,52 @@ class Piro:
             result_dict.pop(best)
             final_result.append(best.name)
 
-        print("results for image", final_result)
+        # print("results for image", final_result)
         return final_result
 
     def solve(self) -> List:
         return [0]
 
 
-if __name__ == '__main__':
+def testMain():
+    sets = {"0": 6, "1": 20, "2": 20, "3": 20, "4": 20, "5": 200, '6': 200, '7': 20, '8': 100}
+    finalResults = dict()
+    for setKey, setValue in sets.items():
+        if setKey in ['7', '8']:
+            directory = "F:/images/proj1_daneB/set"
+        else:
+            directory = "F:/images/proj1_daneA/set"
+
+        print(setKey, setValue)
+        images = dict()
+        for n in range(int(setValue)):
+            images[n] = cv2.imread(os.path.join(os.path.dirname(directory + setKey + "/"), str(n) + ".png"),
+                                   cv2.IMREAD_GRAYSCALE)
+        runCorrectList = []
+
+        with open(directory + setKey + "/" + 'correct.txt', 'r') as f:
+            for line in f.readlines():
+                runCorrectList.append(int(line))
+
+        obj_list = []
+        for key, im in images.items():
+            piroObject = Piro(im, key)
+            # print(key)
+            piroObject.process()
+            obj_list.append(piroObject)
+
+        runResults = []
+        for o in obj_list:
+            runResults.append(o.match_distances(obj_list))
+
+        runScore = evaluate(runCorrectList, runResults)
+        finalResults[setKey] = runScore
+        # print("results", runResults)
+        print("Final score", runScore)
+    print("results", finalResults)
+
+
+def runMain():
     images = dict()
     for n in range(int(sys.argv[2])):
         images[n] = cv2.imread(os.path.join(os.path.dirname(sys.argv[1]), str(n) + ".png"), cv2.IMREAD_GRAYSCALE)
@@ -198,3 +236,7 @@ if __name__ == '__main__':
 
     print("results", results)
     print("Final score", evaluate(correct_list, results))
+
+
+if __name__ == '__main__':
+    testMain()
