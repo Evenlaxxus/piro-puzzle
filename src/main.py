@@ -1,7 +1,8 @@
 import math
 import os
 import sys
-from statistics import mean
+from pathlib import Path
+from statistics import stdev
 from typing import List
 import numpy as np
 import cv2
@@ -45,13 +46,10 @@ class Piro:
             approx, imgCopy = self.getMetrics()
 
         self.getEdgePoints()
-
         self.getCurvePointsToCheck()
-
         self.getDistances()
 
-        # cv2.drawContours(imgCopy, [approx], 0, color=(0, 0, 255), thickness=2)
-
+        cv2.drawContours(imgCopy, [approx], 0, color=(0, 0, 255), thickness=2)
         for point in self.pointsToCheck:
             cv2.circle(imgCopy, point, radius=0, color=(0, 255, 0), thickness=6)
 
@@ -69,6 +67,7 @@ class Piro:
                 bPoints = cont[i][0], cont[i + 1][0]
                 maxLength = length
             points.append(tuple(cont[i][0]))
+
         self.basePoints = (tuple(bPoints[0]), tuple(bPoints[1]))
         self.baseLength = maxLength
         shiftTable = []
@@ -88,7 +87,20 @@ class Piro:
                 break
             shiftTable.append(self.contour[i])
         self.allPoints = points
-        self.armsPoints = (self.allPoints[-1], self.allPoints[2])
+
+        threshold = 0.05
+
+        indx = -1
+        self.armsPoints = self.allPoints[indx]
+        while abs(self.armsPoints[1] - self.basePoints[0][1]) < self.basePoints[0][1] * threshold:
+            indx -= 1
+            self.armsPoints = self.allPoints[indx]
+
+        indx = 2
+        self.armsPoints = (self.armsPoints, self.allPoints[indx])
+        while abs(self.armsPoints[1][1] - self.basePoints[1][1]) < self.basePoints[1][1] * threshold:
+            indx += 1
+            self.armsPoints = (self.armsPoints[0], self.allPoints[indx])
 
     def getMetrics(self):
         self.curvePoints = []
@@ -96,7 +108,6 @@ class Piro:
         self.pointsToCheck = []
         self.allPoints = []
         self.distances = []
-        self.armsPoints = tuple()
         self.basePoints = tuple()
 
         self.contours, self.hierarchy = cv2.findContours(self.image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -122,13 +133,16 @@ class Piro:
         return cv2.warpAffine(self.image, rotationMatrix, (w, h), flags=cv2.INTER_LINEAR)
 
     def getCurvePointsToCheck(self):
-        step = round(len(self.curvePoints) / 50)
-        for i in range(step, len(self.curvePoints), step):
+        idx = np.round(np.linspace(0, len(self.curvePoints) - 1, 50)).astype(int)
+        # tutaj nie co równą ilość pkt tylko co równą odległość
+
+        for i in idx:
             self.pointsToCheck.append(self.curvePoints[i])
 
     def getEdgePoints(self):
         curve = False
         for point in self.contour:
+            # print(type(point))
             if curve:
                 self.curvePoints.append(tuple(point))
             if np.all(point == self.armsPoints[1]):
@@ -141,26 +155,17 @@ class Piro:
         for point in self.pointsToCheck:
             self.distances.append((self.basePoints[0][1] - point[1]) / self.baseLength)
 
-    def match_distances(self, piroObjects: List):
+    def match_distances(self, piro_objects: List):
         distances = self.distances.copy()
         distances.reverse()
 
         result_dict = {}
 
-        for o in piroObjects:
+        for o in piro_objects:
             distances2 = o.distances
 
-            if len(distances) > len(distances2):  # TODO: to jest smrut, raczej wszystkie dystanse powinny być takiej samej długości
-                distances = distances[:len(distances2)]
-            elif len(distances) < len(distances2):
-                distances2 = distances2[:len(distances)]
-
-            avg = distances[0] + distances2[0]
-            avg_diff = []
-            for i in range(len(distances)):
-                avg_diff.append(abs(avg - (distances[i] + distances2[i])))
-            # print("avg_diff", avg_diff)
-            result_dict[o] = mean(avg_diff)
+            sum_list = [sum(x) for x in zip(*[distances, distances2])]
+            result_dict[o] = stdev(sum_list)
 
         final_result = []
         while len(result_dict) > 0:
@@ -168,23 +173,20 @@ class Piro:
             result_dict.pop(best)
             final_result.append(best.name)
 
-        # print("results for image", final_result)
         return final_result
-
-    def solve(self) -> List:
-        return [0]
 
 
 def testMain():
     sets = {"0": 6, "1": 20, "2": 20, "3": 20, "4": 20, "5": 200, '6': 200, '7': 20, '8': 100}
+    # sets = {"2": 20}
     finalResults = dict()
+    filepath = "../../p1_2/"
     for setKey, setValue in sets.items():
         if setKey in ['7', '8']:
-            directory = "F:/images/proj1_daneB/set"
+            directory = filepath + "dataB/set"
         else:
-            directory = "F:/images/proj1_daneA/set"
+            directory = filepath + "dataA/set"
 
-        print(setKey, setValue)
         images = dict()
         for n in range(int(setValue)):
             images[n] = cv2.imread(os.path.join(os.path.dirname(directory + setKey + "/"), str(n) + ".png"),
@@ -195,10 +197,17 @@ def testMain():
             for line in f.readlines():
                 runCorrectList.append(int(line))
 
+        img_widths = []
+        for im in images.values():
+            img_widths.append(im.shape[0])
+        avg_width = int(sum(img_widths) / len(images.values()))
+
         obj_list = []
         for key, im in images.items():
+            # scaling
+            height = int(avg_width * (im.shape[0] / im.shape[1]))
+            im = cv2.resize(im, (avg_width, height))
             piroObject = Piro(im, key)
-            # print(key)
             piroObject.process()
             obj_list.append(piroObject)
 
@@ -209,34 +218,33 @@ def testMain():
         runScore = evaluate(runCorrectList, runResults)
         finalResults[setKey] = runScore
         # print("results", runResults)
-        print("Final score", runScore)
+        print(f"Set{setKey}:", runScore)
     print("results", finalResults)
 
 
 def runMain():
     images = dict()
-    for n in range(int(sys.argv[2])):
-        images[n] = cv2.imread(os.path.join(os.path.dirname(sys.argv[1]), str(n) + ".png"), cv2.IMREAD_GRAYSCALE)
-    correct_list = []
 
-    with open(sys.argv[1] + 'correct.txt', 'r') as f:
-        for line in f.readlines():
-            correct_list.append(int(line))
+    for n in range(int(sys.argv[2])):
+        path = Path(sys.argv[1] + "/" + str(n) + ".png")
+        images[n] = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+
+    img_widths = []
+    for im in images.values():
+        img_widths.append(im.shape[0])
+    avg_width = int(sum(img_widths) / len(images.values()))
 
     obj_list = []
     for key, im in images.items():
+        height = int(avg_width * (im.shape[0] / im.shape[1]))
+        im = cv2.resize(im, (avg_width, height))
         piroObject = Piro(im, key)
-        print(key)
         piroObject.process()
         obj_list.append(piroObject)
 
-    results = []
     for o in obj_list:
-        results.append(o.match_distances(obj_list))
-
-    print("results", results)
-    print("Final score", evaluate(correct_list, results))
+        print(*o.match_distances(obj_list))
 
 
 if __name__ == '__main__':
-    testMain()
+    runMain()
