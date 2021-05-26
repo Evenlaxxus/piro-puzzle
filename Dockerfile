@@ -1,7 +1,7 @@
 FROM python:3.8
 LABEL student1="Wojciech Lulek" student2="Rafał Ewiak"
 
-COPY ./src ./app/src
+COPY ./src ./app
 COPY ./requirements.txt ./app/requirements.txt
 
 RUN apt-get update
@@ -13,4 +13,4 @@ WORKDIR "./app/"
 
 ENV PYTHONPATH "${PYTHONPATH}:/app/"
 
-ENTRYPOINT ["python","/src/main.py"]
+ENTRYPOINT ["python", "./main.py"]
