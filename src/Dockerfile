@@ -1,13 +1,16 @@
 FROM python:3.8
 LABEL student1="Wojciech Lulek" student2="Rafał Ewiak"
 
-#COPY ./src ./app/src
+COPY ./src ./app/src
+COPY ./requirements.txt ./app/requirements.txt
 
 RUN apt-get update
 RUN apt-get install ffmpeg libsm6 libxext6 -y
 
-RUN pip install opencv-python numpy
+RUN pip install -r ./app/requirements.txt
 
-WORKDIR "./app/src"
+WORKDIR "./app/"
 
-ENTRYPOINT ["python","/app/src/main.py"]
+ENV PYTHONPATH "${PYTHONPATH}:/app/"
+
+ENTRYPOINT ["python","/src/main.py"]
