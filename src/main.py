@@ -1,5 +1,4 @@
 import math
-import os
 import sys
 from pathlib import Path
 from statistics import stdev
@@ -174,52 +173,6 @@ class Piro:
             final_result.append(best.name)
 
         return final_result
-
-
-def testMain():
-    sets = {"0": 6, "1": 20, "2": 20, "3": 20, "4": 20, "5": 200, '6': 200, '7': 20, '8': 100}
-    # sets = {"2": 20}
-    finalResults = dict()
-    filepath = "../../p1_2/"
-    for setKey, setValue in sets.items():
-        if setKey in ['7', '8']:
-            directory = filepath + "dataB/set"
-        else:
-            directory = filepath + "dataA/set"
-
-        images = dict()
-        for n in range(int(setValue)):
-            images[n] = cv2.imread(os.path.join(os.path.dirname(directory + setKey + "/"), str(n) + ".png"),
-                                   cv2.IMREAD_GRAYSCALE)
-        runCorrectList = []
-
-        with open(directory + setKey + "/" + 'correct.txt', 'r') as f:
-            for line in f.readlines():
-                runCorrectList.append(int(line))
-
-        img_widths = []
-        for im in images.values():
-            img_widths.append(im.shape[0])
-        avg_width = int(sum(img_widths) / len(images.values()))
-
-        obj_list = []
-        for key, im in images.items():
-            # scaling
-            height = int(avg_width * (im.shape[0] / im.shape[1]))
-            im = cv2.resize(im, (avg_width, height))
-            piroObject = Piro(im, key)
-            piroObject.process()
-            obj_list.append(piroObject)
-
-        runResults = []
-        for o in obj_list:
-            runResults.append(o.match_distances(obj_list))
-
-        runScore = evaluate(runCorrectList, runResults)
-        finalResults[setKey] = runScore
-        # print("results", runResults)
-        print(f"Set{setKey}:", runScore)
-    print("results", finalResults)
 
 
 def runMain():

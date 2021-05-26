@@ -10,6 +10,4 @@ RUN pip install opencv-python numpy
 
 WORKDIR "./app/src"
 
-ENV PYTHONPATH "${PYTHONPATH}:/app/src/"
-
 ENTRYPOINT ["python","/app/src/main.py"]
